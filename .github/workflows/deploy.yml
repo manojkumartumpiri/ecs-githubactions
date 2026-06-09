@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 env:
-  ECR_REPOSITORY: day15
-  ECS_CLUSTER: dev-ecs-cluster
+  ECR_REPOSITORY: 865950114072.dkr.ecr.ap-southeast-2.amazonaws.com/day15
+  ECS_CLUSTER: dev-ecs-cluster-service
   ECS_SERVICE: dev-ecs-cluster-service
   AWS_REGION: ap-southeast-2
 
@@ -41,7 +41,7 @@ jobs:
         run: |
           docker tag day15:latest \
           ${{ steps.login-ecr.outputs.registry }}/day15:latest
-          
+
 
       - name: Push Image
         run: |
