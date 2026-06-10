@@ -3,7 +3,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return {"status": "ok", "service": "ecr", "version-automated-image tag": "4.0.0"}
+    return {"congratulations": "your flask app is running in a container! with automation from github actions and deployed to AWS ECS!  "}
 
 @app.route("/health")
 def health():
