@@ -1,4 +1,4 @@
-name: Deploy ECS
+name: Deploy ECS Fargate
 
 on:
   push:
@@ -10,47 +10,57 @@ permissions:
   contents: read
 
 env:
-  ECR_REPOSITORY: 865950114072.dkr.ecr.ap-southeast-2.amazonaws.com/day15
-  ECS_CLUSTER: dev-ecs-cluster
-  ECS_SERVICE: dev-ecs-cluster-service-2
   AWS_REGION: ap-southeast-2
+  ECR_REPOSITORY: day15
+  ECS_CLUSTER: dev-ecs-cluster
+  ECS_SERVICE: dev-ecs-cluster-service
+  TASK_DEFINITION: ecs/task-definition.json
+  CONTAINER_NAME: flask
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Source
         uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build Docker Image
         run: |
-          docker build -t day15:latest .
+          docker build -t $ECR_REPOSITORY:${{ github.sha }} .
 
-      - name: Tag Image
+      - name: Tag Docker Image
         run: |
-          docker tag day15:latest \
-          ${{ steps.login-ecr.outputs.registry }}/day15:latest
+          docker tag $ECR_REPOSITORY:${{ github.sha }} \
+          ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
 
-
-      - name: Push Image
+      - name: Push Docker Image
         run: |
           docker push \
-          ${{ steps.login-ecr.outputs.registry }}/day15:latest
+          ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:${{ github.sha }}
 
-      - name: Force ECS Deployment
-        run: |
-          aws ecs update-service \
-          --cluster dev-ecs-cluster \
-          --service dev-ecs-cluster-service-2 \
-          --force-new-deployment
+      - name: Render ECS Task Definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      - name: Deploy ECS Task Definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
